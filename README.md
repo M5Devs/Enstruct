@@ -1,7 +1,7 @@
 # 🎙️ Enstruct
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/m5devs/enstruct/main/assets/logo.png" alt="Enstruct Logo" width="150" style="border-radius: 50%"/>
+  <img src="https://raw.githubusercontent.com/M5Devs/Enstruct/main/assets/logo.png" alt="Enstruct Logo" width="150" style="border-radius: 50%"/>
 </p>
 
 <p align="center">
@@ -9,16 +9,16 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/m5devs/enstruct/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/enstruct/enstruct?style=flat-square" alt="MIT License" />
+  <a href="https://github.com/M5Devs/Enstruct/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/M5Devs/Enstruct?style=flat-square" alt="AGPL v3 License" />
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/python-3.8+-blue.svg?style=flat-square" alt="Python 3.8+" />
   </a>
-  <a href="https://github.com/m5devs/enstruct">
+  <a href="https://github.com/M5Devs/Enstruct">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs Welcome" />
   </a>
-  <a href="https://colab.research.google.com/github/m5devs/enstruct/blob/main/notebooks/Enstruct_Colab.ipynb">
+  <a href="https://colab.research.google.com/github/M5Devs/Enstruct/blob/main/notebooks/Enstruct_Colab.ipynb">
     <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab" />
   </a>
 </p>
@@ -36,7 +36,7 @@
 * 📂 **Batch Folder Processing**: Automatically transcribes entire folders of audio/video files with beautiful progress indicators.
 * 🎬 **YouTube Integration**: Transcribe and translate YouTube video content directly via url input.
 * ☁️ **Google Drive Storage**: Seamless automatic drive mounting and file saving inside Google Colab.
-* 🎙️ **Flexible Interfaces**: Supports a robust **Command Line Interface (CLI)** and a sleek, interactive **Gradio Web UI**.
+* 🎙️ **Flexible Interfaces**: Supports a robust **Command Line Interface (CLI)** and a sleek, interactive **Gradio Web UI** with activity history.
 * 🧠 **Auto-Hardware Detection**: Dynamically utilizes CUDA if an NVIDIA GPU is available, falling back safely to highly-optimized CPU execution.
 
 ---
@@ -50,7 +50,7 @@
 | **Privacy** | 🔒 Zero data shared, fully private | Processed on third-party | Processed on third-party | Processed on third-party |
 | **Batch Support** | ✅ Built-in CLI & API | Limited | Limited | Paid API-only |
 | **Translation** | ✅ Any-to-English | Limited | Paid | Paid |
-| **Open Source** | 🔓 Yes (MIT License) | No | No | No |
+| **Open Source** | 🔓 Yes (AGPL v3 License) | No | No | No |
 
 ---
 
@@ -69,7 +69,7 @@ pip install enstruct
 
 ## 💻 Usage
 
-Enstruct is designed to work seamlessly both as a command-line tool and as a Python library.
+ENstruct is designed to work seamlessly both as a command-line tool and as a Python library.
 
 ### 1. Command Line Interface (CLI)
 
@@ -124,12 +124,12 @@ print(f"Downloaded audio to: {audio_file}")
 
 #### Google Drive Manager (Google Colab only)
 ```python
-from enstruct.tools.drive import DriveManager
+from enstruct.integrations.drive import DriveManager
 
 drive_manager = DriveManager()
 # Mount Google Drive
 drive_manager.mount_drive()
-# Save transcript directly to Drive: /content/drive/MyDrive/Enstruct_Transcriptions
+# Save transcript directly to Drive: /content/drive/MyDrive/Enstruct/outputs
 drive_manager.save_file("transcript.srt", "Subtitles content...")
 ```
 
@@ -137,7 +137,7 @@ drive_manager.save_file("transcript.srt", "Subtitles content...")
 
 ## 🌐 Gradio Web Interface
 
-Enstruct comes with an interactive, beautiful browser-based Web UI featuring dynamic source input switching.
+Enstruct comes with an interactive, beautiful browser-based Web UI featuring dynamic source input switching and session logs history.
 
 To start the Web UI locally:
 ```bash
@@ -146,13 +146,23 @@ python -m interfaces.web.app
 Then, open `http://localhost:7860` in your browser. You can:
 1. **Choose Audio Source**: Select between "Upload / Microphone", "Google Drive" (Colab path), or "YouTube URL".
 2. **Configure options**: Choose model sizes (tiny to large-v3), output formats (SRT, VTT, TXT), and task (Transcribe or Translate).
-3. **Execute & Download**: Run transcription, preview results, and download output files immediately.
+3. **Activity Logs & History**: Track session logs inside the "History" tab, refresh listings, or clear all history logs.
+4. **Execute & Download**: Run transcription, preview results, and download output files immediately.
+
+---
+
+## 💼 Commercial Use
+
+Enstruct is free under **AGPL v3** for open-source and personal use.
+
+If you want to use Enstruct in a **closed-source or commercial product**, a commercial license is required.
+See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for pricing and details.
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions from the open-source community!
+We welcome contributions from the open-source community! 
 1. Fork the Repository.
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`).
 3. Set up development environment and run tests:
@@ -168,4 +178,5 @@ We welcome contributions from the open-source community!
 
 ## 📄 License
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
+Distributed under the **AGPL v3 License**. See `LICENSE` for more information.
+Commercial licensing and bespoke features are also available.

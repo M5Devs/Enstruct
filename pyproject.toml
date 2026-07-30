@@ -8,14 +8,14 @@ version = "0.1.0"
 description = "A professional toolkit for wrapping OpenAI's Whisper model (via faster-whisper) to transcribe, translate, and structure audio files."
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = {text = "AGPL v3"}
 authors = [
-    {name = "Enstruct Authors"}
+    {name = "M5Devs"}
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -34,7 +34,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/enstruct/enstruct"
+Homepage = "https://github.com/M5Devs/Enstruct"
 
 [project.scripts]
 enstruct = "interfaces.cli.main:cli"
