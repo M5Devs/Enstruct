@@ -34,6 +34,8 @@
 * 🌐 **Any-to-English Translation**: Translate speech from dozens of languages directly to fluent English transcripts.
 * 📝 **Multi-Format Export**: Generates professional `SRT` and `VTT` subtitle files, alongside raw `TXT` transcripts.
 * 📂 **Batch Folder Processing**: Automatically transcribes entire folders of audio/video files with beautiful progress indicators.
+* 🎬 **YouTube Integration**: Transcribe and translate YouTube video content directly via url input.
+* ☁️ **Google Drive Storage**: Seamless automatic drive mounting and file saving inside Google Colab.
 * 🎙️ **Flexible Interfaces**: Supports a robust **Command Line Interface (CLI)** and a sleek, interactive **Gradio Web UI**.
 * 🧠 **Auto-Hardware Detection**: Dynamically utilizes CUDA if an NVIDIA GPU is available, falling back safely to highly-optimized CPU execution.
 
@@ -90,6 +92,7 @@ enstruct detect-language conversation.wav
 
 ### 2. Python API
 
+#### Standard Transcription
 ```python
 from enstruct.core.transcriber import EnstructTranscriber
 
@@ -109,17 +112,41 @@ generator = SubtitleGenerator()
 generator.generate(result["segments"], "interview.srt", format="srt")
 ```
 
+#### YouTube Downloader
+```python
+from enstruct.tools.youtube import YouTubeDownloader
+
+downloader = YouTubeDownloader()
+# Download best-quality audio from YouTube URL and save as MP3
+audio_file = downloader.download_audio("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+print(f"Downloaded audio to: {audio_file}")
+```
+
+#### Google Drive Manager (Google Colab only)
+```python
+from enstruct.tools.drive import DriveManager
+
+drive_manager = DriveManager()
+# Mount Google Drive
+drive_manager.mount_drive()
+# Save transcript directly to Drive: /content/drive/MyDrive/Enstruct_Transcriptions
+drive_manager.save_file("transcript.srt", "Subtitles content...")
+```
+
 ---
 
 ## 🌐 Gradio Web Interface
 
-Enstruct comes with an interactive, beautiful browser-based Web UI.
+Enstruct comes with an interactive, beautiful browser-based Web UI featuring dynamic source input switching.
 
 To start the Web UI locally:
 ```bash
 python -m interfaces.web.app
 ```
-Then, open `http://localhost:7860` in your browser to record speech, upload files, customize model sizes, and download SRT/VTT/TXT transcripts instantly.
+Then, open `http://localhost:7860` in your browser. You can:
+1. **Choose Audio Source**: Select between "Upload / Microphone", "Google Drive" (Colab path), or "YouTube URL".
+2. **Configure options**: Choose model sizes (tiny to large-v3), output formats (SRT, VTT, TXT), and task (Transcribe or Translate).
+3. **Execute & Download**: Run transcription, preview results, and download output files immediately.
 
 ---
 

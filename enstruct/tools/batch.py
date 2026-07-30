@@ -54,7 +54,12 @@ class BatchProcessor:
         os.makedirs(output_folder, exist_ok=True)
 
         # Get all supported files in the folder (non-recursive for simplicity/cleanliness)
-        all_files = os.listdir(folder_path)
+        try:
+            all_files = os.listdir(folder_path)
+        except Exception as e:
+            logger.error("Failed to read folder contents of '%s': %s", folder_path, str(e))
+            raise RuntimeError(f"Error reading directory: {e}") from e
+
         supported_files = [
             f for f in all_files
             if os.path.splitext(f.lower())[1] in self.SUPPORTED_EXTENSIONS

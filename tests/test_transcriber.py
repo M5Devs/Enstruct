@@ -1,8 +1,10 @@
+import sys
 import pytest
 import os
 from unittest.mock import MagicMock, patch
 from enstruct.core.transcriber import EnstructTranscriber, detect_optimal_device
 from enstruct.core.translator import EnstructTranslator
+from enstruct.tools.drive import DriveManager
 
 
 def test_detect_optimal_device():
@@ -103,3 +105,71 @@ def test_translator_success(mock_exists, mock_whisper):
     assert result["text"] == "This is a translation."
     # Ensure WhisperModel's transcribe was called with task="translate"
     mock_model_instance.transcribe.assert_called_once_with("dummy_audio.wav", language=None, task="translate")
+
+
+def test_drive_manager_local_execution():
+    # DriveManager should not mount or crash when executing locally
+    with patch.dict(sys.modules):
+        if "google.colab" in sys.modules:
+            del sys.modules["google.colab"]
+        manager = DriveManager()
+        assert not manager.is_colab
+        assert not manager.mount_drive()
+        assert manager.save_file("test.srt", "test") is None
+
+
+def test_drive_manager_colab_execution():
+    # Mock google.colab and google.colab.drive to test colab execution paths
+    mock_drive = MagicMock()
+    mock_colab = MagicMock()
+    mock_colab.drive = mock_drive
+
+    with patch.dict(sys.modules, {
+        "google": MagicMock(),
+        "google.colab": mock_colab,
+        "google.colab.drive": mock_drive
+    }):
+        manager = DriveManager()
+        assert manager.is_colab
+        assert manager.mount_drive()
+        assert manager.is_mounted
+
+        # Test save file
+        with patch("os.makedirs") as mock_makedirs, \
+             patch("builtins.open", create=True) as mock_open:
+            path = manager.save_file("sub.srt", "subtitle content")
+            assert path == os.path.join(manager.MOUNT_POINT, manager.SAVE_SUBDIR, "sub.srt")
+
+
+def test_youtube_downloader_not_installed():
+    with patch("enstruct.tools.youtube.yt_dlp", None):
+        # Importing or instantiating should raise RuntimeError when yt-dlp is not available
+        from enstruct.tools.youtube import YouTubeDownloader
+        with pytest.raises(RuntimeError) as excinfo:
+            YouTubeDownloader()
+        assert "yt-dlp" in str(excinfo.value)
+
+
+def test_youtube_downloader_empty_url():
+    from enstruct.tools.youtube import YouTubeDownloader
+    downloader = YouTubeDownloader()
+    with pytest.raises(ValueError):
+        downloader.download_audio("")
+
+
+@patch("enstruct.tools.youtube.yt_dlp")
+def test_youtube_downloader_success(mock_yt_dlp):
+    from enstruct.tools.youtube import YouTubeDownloader
+
+    mock_ydl_instance = MagicMock()
+    mock_info = {
+        "title": "Sample Video Title",
+        "requested_downloads": [{"filepath": "/tmp/Sample Video Title.mp3"}]
+    }
+    mock_ydl_instance.extract_info.return_value = mock_info
+    mock_yt_dlp.YoutubeDL.return_value.__enter__.return_value = mock_ydl_instance
+
+    downloader = YouTubeDownloader()
+    with patch("os.path.exists", return_value=True):
+        path = downloader.download_audio("https://www.youtube.com/watch?v=dQw4w9WgXcQ", output_dir="/tmp")
+        assert "Sample Video Title.mp3" in path
