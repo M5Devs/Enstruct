@@ -1,7 +1,7 @@
 # 🎙️ Enstruct
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/enstruct/enstruct/main/assets/logo.png" alt="Enstruct Logo" width="150" style="border-radius: 50%"/>
+  <img src="https://raw.githubusercontent.com/m5devs/enstruct/main/assets/logo.png" alt="Enstruct Logo" width="150" style="border-radius: 50%"/>
 </p>
 
 <p align="center">
@@ -9,16 +9,16 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/enstruct/enstruct/blob/main/LICENSE">
+  <a href="https://github.com/m5devs/enstruct/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/enstruct/enstruct?style=flat-square" alt="MIT License" />
   </a>
   <a href="https://www.python.org/">
     <img src="https://img.shields.io/badge/python-3.8+-blue.svg?style=flat-square" alt="Python 3.8+" />
   </a>
-  <a href="https://github.com/enstruct/enstruct">
+  <a href="https://github.com/m5devs/enstruct">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs Welcome" />
   </a>
-  <a href="https://colab.research.google.com/github/enstruct/enstruct/blob/main/notebooks/Enstruct_Colab.ipynb">
+  <a href="https://colab.research.google.com/github/m5devs/enstruct/blob/main/notebooks/Enstruct_Colab.ipynb">
     <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab" />
   </a>
 </p>
