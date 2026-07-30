@@ -1,13 +1,15 @@
 import logging
 import os
 import tempfile
-from typing import Tuple, Optional, Any, Dict
+import uuid
+from datetime import datetime
+from typing import Tuple, Optional, Any, Dict, List
 import gradio as gr
 
 from enstruct.core.transcriber import EnstructTranscriber
 from enstruct.core.translator import EnstructTranslator
 from enstruct.tools.subtitle import SubtitleGenerator
-from enstruct.tools.drive import DriveManager
+from enstruct.integrations.drive import DriveManager
 
 # Try importing YouTubeDownloader; handle missing yt-dlp gracefully
 try:
@@ -30,7 +32,9 @@ def process_audio_source(
     output_format: str,
     language: Optional[str] = None
 ) -> Tuple[str, str, str]:
-    """Processes audio based on source selection (Upload, Google Drive, or YouTube URL).
+    """Processes audio based on source selection (Upload, Google Drive, or YouTube URL)
+
+    and logs the session details (success or error) into the History system.
 
     Args:
         source_type: "Upload / Microphone", "Google Drive", or "YouTube URL".
@@ -49,17 +53,25 @@ def process_audio_source(
     status_msg = ""
     drive_manager = DriveManager()
 
+    # Log session variables
+    session_id = str(uuid.uuid4())[:8]
+    lang_logged = language if language and language.strip() else "Auto-detect"
+    duration_logged = 0.0
+    output_path_logged = "N/A"
+    status_logged = "Error"
+    error_logged = ""
+
     try:
         # Determine and resolve input file path based on source selection
         if source_type == "Upload / Microphone":
             if not upload_file:
-                return "No upload audio file provided.", "", "Error: Missing audio file."
+                raise ValueError("No upload audio file provided.")
             input_file_path = upload_file
             status_msg = "Successfully processed uploaded audio file."
 
         elif source_type == "Google Drive":
             if not drive_file_path or not drive_file_path.strip():
-                return "No Google Drive path provided.", "", "Error: Missing Drive path."
+                raise ValueError("No Google Drive path provided.")
 
             # Normalize drive path or resolve under typical mount point
             target_path = drive_file_path.strip()
@@ -73,38 +85,26 @@ def process_audio_source(
                     logger.info("Attempting to auto-mount Google Drive...")
                     drive_manager.mount_drive()
                 if not os.path.exists(target_path):
-                    return (
-                        f"Google Drive file not found at: {target_path}",
-                        "",
-                        "Error: File not found. Please ensure Google Drive is mounted and the path is correct."
-                    )
+                    raise FileNotFoundError(f"Google Drive file not found at: {target_path}")
 
             input_file_path = target_path
             status_msg = f"Successfully loaded file from Google Drive: {target_path}"
 
         elif source_type == "YouTube URL":
             if not youtube_url or not youtube_url.strip():
-                return "No YouTube URL provided.", "", "Error: Missing YouTube URL."
+                raise ValueError("No YouTube URL provided.")
 
             if YouTubeDownloader is None:
-                return (
-                    "YouTube Downloader is unavailable because 'yt-dlp' is not installed.",
-                    "",
-                    "Error: Missing dependency 'yt-dlp'. Install it with: pip install yt-dlp"
-                )
+                raise RuntimeError("YouTube Downloader is unavailable because 'yt-dlp' is not installed.")
 
-            try:
-                downloader = YouTubeDownloader()
-                temp_dir = tempfile.gettempdir()
-                # Download YouTube audio
-                input_file_path = downloader.download_audio(youtube_url, output_dir=temp_dir)
-                status_msg = "Successfully downloaded and extracted audio from YouTube."
-            except Exception as e:
-                logger.error("Failed downloading YouTube audio: %s", str(e))
-                return f"Failed downloading YouTube video: {e}", "", "Error: YouTube download failed."
+            downloader = YouTubeDownloader()
+            temp_dir = tempfile.gettempdir()
+            # Download YouTube audio
+            input_file_path = downloader.download_audio(youtube_url, output_dir=temp_dir)
+            status_msg = "Successfully downloaded and extracted audio from YouTube."
 
         else:
-            return "Invalid source type selection.", "", "Error: Invalid source."
+            raise ValueError("Invalid source type selection.")
 
         # Initialize appropriate core wrapper and transcribe
         logger.info("Initializing model '%s' for task '%s'", model_size, task)
@@ -116,6 +116,9 @@ def process_audio_source(
             transcriber = EnstructTranscriber(model_size=model_size)
             result = transcriber.transcribe(input_file_path, language=lang_param)
 
+        duration_logged = float(result.get("duration", 0.0))
+        lang_logged = result.get("language", lang_logged)
+
         # Write result to a temporary file of requested format
         temp_dir = tempfile.gettempdir()
         base_name = os.path.splitext(os.path.basename(input_file_path))[0]
@@ -124,6 +127,7 @@ def process_audio_source(
 
         generator = SubtitleGenerator()
         generator.generate(result["segments"], local_out_path, format=output_format)
+        output_path_logged = local_out_path
 
         # Try to save the output directly to Google Drive if possible/mounted
         drive_save_msg = ""
@@ -133,6 +137,7 @@ def process_audio_source(
             drive_path = drive_manager.save_file(out_filename, content)
             if drive_path:
                 drive_save_msg = f" Also saved directly to Google Drive: {drive_path}"
+                output_path_logged = drive_path
             else:
                 drive_save_msg = " [Warning: Could not save output to Google Drive. Check drive mount.]"
 
@@ -141,10 +146,44 @@ def process_audio_source(
             preview += "\n\n...[Preview truncated, download output file for full content]..."
 
         final_status = f"{status_msg} Processing completed successfully.{drive_save_msg}"
+        status_logged = "Success"
+
+        # Log success session
+        entry = {
+            "id": session_id,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "source": source_type,
+            "language": lang_logged,
+            "duration": duration_logged,
+            "model": model_size,
+            "format": output_format,
+            "output_path": output_path_logged,
+            "status": status_logged,
+            "error_message": error_logged
+        }
+        drive_manager.log_session(entry)
+
         return preview, local_out_path, final_status
 
     except Exception as e:
         logger.error("Web processing error: %s", str(e))
+        error_logged = str(e)
+
+        # Log failed session
+        entry = {
+            "id": session_id,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "source": source_type,
+            "language": lang_logged,
+            "duration": duration_logged,
+            "model": model_size,
+            "format": output_format,
+            "output_path": output_path_logged,
+            "status": status_logged,
+            "error_message": error_logged
+        }
+        drive_manager.log_session(entry)
+
         return f"An error occurred: {e}", "", f"Error: {e}"
 
 
@@ -159,8 +198,39 @@ def on_source_change(source: str) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[
     return gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)
 
 
+def refresh_history_table() -> List[List[str]]:
+    """Retrieves session history entries and formats them for the gr.Dataframe.
+
+    Returns:
+        A list of lists with values matching the dataframe columns.
+    """
+    manager = DriveManager()
+    history = manager.get_history()
+    rows = []
+    for item in history:
+        duration_val = item.get("duration", 0.0)
+        duration_str = f"{duration_val:.2f}s" if isinstance(duration_val, (int, float)) else str(duration_val)
+        rows.append([
+            item.get("date", ""),
+            item.get("source", ""),
+            item.get("language", ""),
+            duration_str,
+            item.get("model", ""),
+            item.get("format", ""),
+            item.get("status", "")
+        ])
+    return rows
+
+
+def clear_history_and_refresh() -> List[List[str]]:
+    """Clears all session logs and returns an empty list to clear the table."""
+    manager = DriveManager()
+    manager.clear_history()
+    return []
+
+
 def create_demo() -> gr.Blocks:
-    """Builds and returns the Gradio interface Blocks object."""
+    """Builds and returns the Gradio interface Blocks object with three tabs."""
     with gr.Blocks(title="Enstruct - Transcribe. Structure. Free.") as demo:
         gr.Markdown(
             """
@@ -171,84 +241,130 @@ def create_demo() -> gr.Blocks:
             """
         )
 
-        with gr.Row():
-            with gr.Column():
-                source_input = gr.Radio(
-                    choices=["Upload / Microphone", "Google Drive", "YouTube URL"],
-                    value="Upload / Microphone",
-                    label="Audio Source"
+        with gr.Tabs():
+            # Tab 1: Transcribe / Translate
+            with gr.Tab("🎙️ Transcribe / Translate"):
+                with gr.Row():
+                    with gr.Column():
+                        source_input = gr.Radio(
+                            choices=["Upload / Microphone", "Google Drive", "YouTube URL"],
+                            value="Upload / Microphone",
+                            label="Audio Source"
+                        )
+
+                        # Visibility-controlled inputs
+                        audio_upload = gr.Audio(
+                            sources=["upload", "microphone"],
+                            type="filepath",
+                            label="Input Audio File",
+                            visible=True
+                        )
+                        drive_path_input = gr.Textbox(
+                            placeholder="e.g. MyDrive/Recordings/meeting.mp3 or absolute path",
+                            label="Google Drive Path",
+                            visible=False
+                        )
+                        youtube_url_input = gr.Textbox(
+                            placeholder="e.g. https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                            label="YouTube Video/Audio URL",
+                            visible=False
+                        )
+
+                        task_input = gr.Radio(
+                            choices=["Transcribe", "Translate to English"],
+                            value="Transcribe",
+                            label="Task"
+                        )
+                        model_input = gr.Dropdown(
+                            choices=["tiny", "base", "small", "medium", "large-v3"],
+                            value="base",
+                            label="Whisper Model Size"
+                        )
+                        format_input = gr.Radio(
+                            choices=["srt", "vtt", "txt"],
+                            value="srt",
+                            label="Output Format"
+                        )
+                        lang_input = gr.Textbox(
+                            placeholder="Auto-detect (or enter code like 'es', 'fr', 'en')",
+                            label="Language Code (Optional)"
+                        )
+                        submit_btn = gr.Button("Process Audio", variant="primary")
+
+                    with gr.Column():
+                        status_output = gr.Textbox(label="Status Message", interactive=False)
+                        text_preview = gr.Textbox(label="Text Preview (Truncated at 2000 chars)", interactive=False, lines=10)
+                        file_output = gr.File(label="Download Subtitle / Text File")
+
+                # Source visibility logic handler
+                source_input.change(
+                    fn=on_source_change,
+                    inputs=[source_input],
+                    outputs=[audio_upload, drive_path_input, youtube_url_input]
                 )
 
-                # Visibility-controlled inputs
-                audio_upload = gr.Audio(
-                    sources=["upload", "microphone"],
-                    type="filepath",
-                    label="Input Audio File",
-                    visible=True
-                )
-                drive_path_input = gr.Textbox(
-                    placeholder="e.g. MyDrive/Recordings/meeting.mp3 or absolute path",
-                    label="Google Drive Path",
-                    visible=False
-                )
-                youtube_url_input = gr.Textbox(
-                    placeholder="e.g. https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                    label="YouTube Video/Audio URL",
-                    visible=False
+                submit_btn.click(
+                    fn=process_audio_source,
+                    inputs=[
+                        source_input,
+                        audio_upload,
+                        drive_path_input,
+                        youtube_url_input,
+                        task_input,
+                        model_input,
+                        format_input,
+                        lang_input
+                    ],
+                    outputs=[text_preview, file_output, status_output]
                 )
 
-                task_input = gr.Radio(
-                    choices=["Transcribe", "Translate to English"],
-                    value="Transcribe",
-                    label="Task"
-                )
-                model_input = gr.Dropdown(
-                    choices=["tiny", "base", "small", "medium", "large-v3"],
-                    value="base",
-                    label="Whisper Model Size"
-                )
-                format_input = gr.Radio(
-                    choices=["srt", "vtt", "txt"],
-                    value="srt",
-                    label="Output Format"
-                )
-                lang_input = gr.Textbox(
-                    placeholder="Auto-detect (or enter code like 'es', 'fr', 'en')",
-                    label="Language Code (Optional)"
-                )
-                submit_btn = gr.Button("Process Audio", variant="primary")
+            # Tab 2: History
+            with gr.Tab("📋 History"):
+                gr.Markdown("### 📜 Session History logs and activity details.")
+                refresh_btn = gr.Button("🔄 Refresh History", variant="primary")
 
-            with gr.Column():
-                status_output = gr.Textbox(label="Status Message", interactive=False)
-                text_preview = gr.Textbox(label="Text Preview (Truncated at 2000 chars)", interactive=False, lines=10)
-                file_output = gr.File(label="Download Subtitle / Text File")
+                history_table = gr.Dataframe(
+                    headers=["Date", "Source", "Language", "Duration", "Model", "Format", "Status"],
+                    datatype=["str", "str", "str", "str", "str", "str", "str"],
+                    col_count=(7, "fixed"),
+                    label="Logged Sessions Table",
+                    interactive=False
+                )
 
-        # Source visibility logic handler
-        source_input.change(
-            fn=on_source_change,
-            inputs=[source_input],
-            outputs=[audio_upload, drive_path_input, youtube_url_input]
-        )
+                clear_btn = gr.Button("🗑️ Clear History", variant="stop")
 
-        submit_btn.click(
-            fn=process_audio_source,
-            inputs=[
-                source_input,
-                audio_upload,
-                drive_path_input,
-                youtube_url_input,
-                task_input,
-                model_input,
-                format_input,
-                lang_input
-            ],
-            outputs=[text_preview, file_output, status_output]
-        )
+                refresh_btn.click(
+                    fn=refresh_history_table,
+                    inputs=[],
+                    outputs=[history_table]
+                )
+
+                clear_btn.click(
+                    fn=clear_history_and_refresh,
+                    inputs=[],
+                    outputs=[history_table]
+                )
+
+            # Tab 3: About
+            with gr.Tab("⚙️ About"):
+                gr.Markdown(
+                    """
+                    ### 🎙️ Enstruct Project Information
+
+                    **Enstruct** is an elite, open-source audio transcription & translation utility.
+                    It wraps OpenAI's Whisper architectures via the lightning-fast `faster-whisper` package
+                    utilizing CTranslate2 to achieve real-time and robust subtitle generation completely for free.
+
+                    * **GitHub Repository:** [github.com/enstruct/enstruct](https://github.com/enstruct/enstruct) (Placeholder)
+                    * **License:** Licensed under the **AGPL v3 License**
+                    * **Commercial Use:** *Commercial licenses are available for enterprise deployments, custom model fine-tuning, and premium API scaling.*
+                    """
+                )
 
         gr.Markdown(
             """
             ---
-            *Enstruct is part of the professional open-source toolkit portfolio. Licensed under the MIT License.*
+            *Enstruct is part of the professional open-source toolkit portfolio. Licensed under the AGPL v3 License.*
             """
         )
 

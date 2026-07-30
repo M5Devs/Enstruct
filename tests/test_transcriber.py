@@ -1,10 +1,11 @@
 import sys
 import pytest
 import os
+import tempfile
 from unittest.mock import MagicMock, patch
 from enstruct.core.transcriber import EnstructTranscriber, detect_optimal_device
 from enstruct.core.translator import EnstructTranslator
-from enstruct.tools.drive import DriveManager
+from enstruct.integrations.drive import DriveManager
 
 
 def test_detect_optimal_device():
@@ -115,7 +116,7 @@ def test_drive_manager_local_execution():
         manager = DriveManager()
         assert not manager.is_colab
         assert not manager.mount_drive()
-        assert manager.save_file("test.srt", "test") is None
+        assert manager.save_file("test.srt", "test") is not None  # Local fallback active
 
 
 def test_drive_manager_colab_execution():
@@ -138,7 +139,45 @@ def test_drive_manager_colab_execution():
         with patch("os.makedirs") as mock_makedirs, \
              patch("builtins.open", create=True) as mock_open:
             path = manager.save_file("sub.srt", "subtitle content")
-            assert path == os.path.join(manager.MOUNT_POINT, manager.SAVE_SUBDIR, "sub.srt")
+            assert path == os.path.join(manager.OUTPUTS_DIR, "sub.srt")
+
+
+def test_drive_manager_history_and_folders():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manager = DriveManager()
+        manager.LOCAL_ROOT = tmpdir
+        manager.LOCAL_OUTPUTS_DIR = os.path.join(tmpdir, "outputs")
+        manager.LOCAL_HISTORY_FILE = os.path.join(tmpdir, "history.json")
+
+        manager.ensure_folders()
+        assert os.path.exists(manager.LOCAL_ROOT)
+        assert os.path.exists(manager.LOCAL_OUTPUTS_DIR)
+
+        # Retrieve empty history
+        assert manager.get_history() == []
+
+        # Log session
+        entry = {
+            "id": "123",
+            "date": "2026-07-30 12:00:00",
+            "source": "YouTube URL",
+            "language": "en",
+            "duration": 5.5,
+            "model": "base",
+            "format": "srt",
+            "output_path": "/tmp/test.srt",
+            "status": "Success",
+            "error_message": ""
+        }
+        manager.log_session(entry)
+
+        history = manager.get_history()
+        assert len(history) == 1
+        assert history[0]["id"] == "123"
+
+        # Clear history
+        manager.clear_history()
+        assert manager.get_history() == []
 
 
 def test_youtube_downloader_not_installed():
