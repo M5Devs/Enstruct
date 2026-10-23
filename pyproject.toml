@@ -30,8 +30,15 @@ dependencies = [
     "tqdm>=4.0.0",
     "gradio>=4.0.0",
     "ffmpeg-python>=0.2.0",
-    "yt-dlp>=2024.1.0"
+    "yt-dlp>=2024.1.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "python-multipart>=0.0.6"
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["enstruct*", "interfaces*"]
 
 [project.urls]
 Homepage = "https://github.com/M5Devs/Enstruct"

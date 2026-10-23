@@ -9,7 +9,7 @@ import gradio as gr
 from enstruct.core.transcriber import EnstructTranscriber
 from enstruct.core.translator import EnstructTranslator
 from enstruct.tools.subtitle import SubtitleGenerator
-from enstruct.integrations.drive import DriveManager
+from enstruct.tools.drive import DriveManager
 
 # Try importing YouTubeDownloader; handle missing yt-dlp gracefully
 try:
@@ -276,8 +276,8 @@ def create_demo() -> gr.Blocks:
                             label="Task"
                         )
                         model_input = gr.Dropdown(
-                            choices=["tiny", "base", "small", "medium", "large-v3"],
-                            value="large-v3",
+                            choices=["tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"],
+                            value="large-v3-turbo",
                             label="Whisper Model Size"
                         )
                         format_input = gr.Radio(

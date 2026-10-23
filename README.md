@@ -27,17 +27,19 @@
 
 ## 🚀 Overview
 
-**Enstruct** is a professional, production-ready, open-source audio toolkit that wraps OpenAI's Whisper model (powered by the high-performance `faster-whisper` engine). Designed to run fully locally or on free cloud instances, Enstruct offers a free, private alternative to expensive paid services like Otter.ai, Transkriptor, and AssemblyAI.
+**Enstruct** is a professional, production-ready, open-source audio toolkit that wraps OpenAI's Whisper model (powered by the high-performance `faster-whisper` engine). Designed to run fully locally, via Docker with GPU acceleration, or on cloud instances, Enstruct offers a free, private alternative to expensive paid services like Otter.ai, Transkriptor, and AssemblyAI.
 
 ### Key Features
 * ⚡ **Ultra-Fast Transcription**: Powered by `faster-whisper` utilizing CTranslate2 for up to 4x speedups over standard Whisper.
+* 🚀 **`large-v3-turbo` Support**: Modern default model size providing high accuracy with significantly lower latency.
 * 🌐 **Any-to-English Translation**: Translate speech from dozens of languages directly to fluent English transcripts.
 * 📝 **Multi-Format Export**: Generates professional `SRT` and `VTT` subtitle files, alongside raw `TXT` transcripts.
-* 📂 **Batch Folder Processing**: Automatically transcribes entire folders of audio/video files with beautiful progress indicators.
-* 🎬 **YouTube Integration**: Transcribe and translate YouTube video content directly via url input.
-* ☁️ **Google Drive Storage**: Seamless automatic drive mounting and file saving inside Google Colab.
-* 🎙️ **Flexible Interfaces**: Supports a robust **Command Line Interface (CLI)** and a sleek, interactive **Gradio Web UI** with activity history.
-* 🧠 **Auto-Hardware Detection**: Dynamically utilizes CUDA if an NVIDIA GPU is available, falling back safely to highly-optimized CPU execution.
+* 📂 **Batch & Watch Folder Auto-Processing**: Transcribe whole folders or continuously monitor inbox directories for automated output.
+* 🔌 **OpenAI-Compatible REST API**: Drop-in API replacement (`/v1/audio/transcriptions`) for seamless integrations with existing Whisper applications.
+* 🐳 **Docker & GPU Support**: Full Docker Container Toolkit support with NVIDIA GPU passthrough (`docker-compose.yml`).
+* 🎬 **YouTube Integration**: Transcribe and translate YouTube video content directly via URL input.
+* ☁️ **Google Drive Storage & History**: Persistent session tracking and seamless drive mounting inside Google Colab.
+* 🎙️ **Flexible Interfaces**: Supports CLI, REST API, and interactive **Gradio Web UI**.
 
 ---
 
@@ -46,9 +48,9 @@
 | Feature | Enstruct (Ours) | Otter.ai | Transkriptor | AssemblyAI |
 | :--- | :---: | :---: | :---: | :---: |
 | **Cost** | 🆓 **100% Free** | Paid Subscription | Paid / Minute | Paid / Minute |
-| **Hosting** | 💻 Fully Local / Self-Hosted | Cloud-only | Cloud-only | API-only |
+| **Hosting** | 💻 Fully Local / Docker | Cloud-only | Cloud-only | API-only |
 | **Privacy** | 🔒 Zero data shared, fully private | Processed on third-party | Processed on third-party | Processed on third-party |
-| **Batch Support** | ✅ Built-in CLI & API | Limited | Limited | Paid API-only |
+| **API / Watch Folder** | ✅ Built-in OpenAI REST API & Watch Folder | Limited | Limited | Paid API-only |
 | **Translation** | ✅ Any-to-English | Limited | Paid | Paid |
 | **Open Source** | 🔓 Yes (AGPL v3 License) | No | No | No |
 
@@ -69,35 +71,62 @@ pip install enstruct
 
 ## 💻 Usage
 
-ENstruct is designed to work seamlessly both as a command-line tool and as a Python library.
+Enstruct is designed to work seamlessly as a command-line tool, REST API server, Docker container, or Python library.
 
 ### 1. Command Line Interface (CLI)
 
 ```bash
-# Transcribe an audio file into default SRT format
+# Transcribe an audio file using default large-v3-turbo model into SRT format
 enstruct transcribe voice_note.mp3
 
 # Transcribe with target language and VTT format
 enstruct transcribe audio.wav --language es --format vtt --output subtitle.vtt
 
-# Translate a Spanish audio file directly to English
-enstruct translate foreign_audio.mp4 --format txt --output english_transcript.txt
+# Watch folder auto-processing (monitors /inbox and saves subtitles to /outbox)
+enstruct watch --input-dir /inbox --output-dir /outbox --format srt
+
+# Launch OpenAI-compatible REST API server
+enstruct api --host 0.0.0.0 --port 8000
 
 # Batch process an entire directory of mixed audio/video files
 enstruct batch /path/to/audios --output /path/to/subtitles --format srt
-
-# Detect spoken language of an audio file
-enstruct detect-language conversation.wav
 ```
 
-### 2. Python API
+### 2. OpenAI-Compatible REST API
 
-#### Standard Transcription
+Start the REST API server:
+```bash
+enstruct api
+```
+
+Send a transcription request using standard OpenAI Whisper parameters:
+```bash
+curl http://localhost:8000/v1/audio/transcriptions \
+  -F file="@speech.mp3" \
+  -F model="large-v3-turbo" \
+  -F response_format="json"
+```
+
+### 3. Docker Deployment (Self-Hosted)
+
+Run Enstruct with GPU support using Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+This exposes:
+- **Gradio Web UI**: `http://localhost:7860`
+- **OpenAI-Compatible REST API**: `http://localhost:8000`
+
+### 4. Python Library API
+
 ```python
 from enstruct.core.transcriber import EnstructTranscriber
+from enstruct.tools.subtitle import SubtitleGenerator
 
-# Initialize the transcriber (automatically uses GPU if available)
-transcriber = EnstructTranscriber(model_size="large-v3", device="auto")
+# Initialize the transcriber (defaults to large-v3-turbo and auto device selection)
+transcriber = EnstructTranscriber(model_size="large-v3-turbo", device="auto")
 
 # Transcribe audio file
 result = transcriber.transcribe("interview.m4a")
@@ -105,49 +134,36 @@ result = transcriber.transcribe("interview.m4a")
 print(f"Detected Language: {result['language']}")
 print(f"Transcript: {result['text']}")
 
-# Generate subtitle formats using SubtitleGenerator
-from enstruct.tools.subtitle import SubtitleGenerator
-
+# Generate SRT subtitle format
 generator = SubtitleGenerator()
 generator.generate(result["segments"], "interview.srt", format="srt")
 ```
 
-#### YouTube Downloader
+#### Google Drive Manager
 ```python
-from enstruct.tools.youtube import YouTubeDownloader
-
-downloader = YouTubeDownloader()
-# Download best-quality audio from YouTube URL and save as MP3
-audio_file = downloader.download_audio("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-print(f"Downloaded audio to: {audio_file}")
-```
-
-#### Google Drive Manager (Google Colab only)
-```python
-from enstruct.integrations.drive import DriveManager
+from enstruct.tools.drive import DriveManager
 
 drive_manager = DriveManager()
-# Mount Google Drive
-drive_manager.mount_drive()
-# Save transcript directly to Drive: /content/drive/MyDrive/Enstruct/outputs
+# Mount Google Drive (Colab) or store locally
 drive_manager.save_file("transcript.srt", "Subtitles content...")
+# View persistent session history
+history = drive_manager.get_history()
 ```
 
 ---
 
 ## 🌐 Gradio Web Interface
 
-Enstruct comes with an interactive, beautiful browser-based Web UI featuring dynamic source input switching and session logs history.
+Enstruct includes an interactive browser-based Web UI.
 
 To start the Web UI locally:
 ```bash
 python -m interfaces.web.app
 ```
-Then, open `http://localhost:7860` in your browser. You can:
-1. **Choose Audio Source**: Select between "Upload / Microphone", "Google Drive" (Colab path), or "YouTube URL".
-2. **Configure options**: Choose model sizes (tiny to large-v3), output formats (SRT, VTT, TXT), and task (Transcribe or Translate).
-3. **Activity Logs & History**: Track session logs inside the "History" tab, refresh listings, or clear all history logs.
-4. **Execute & Download**: Run transcription, preview results, and download output files immediately.
+Open `http://localhost:7860` in your browser. You can:
+1. **Audio Sources**: Upload files, select Google Drive paths, or paste YouTube URLs.
+2. **Model Selection**: Choose models (`tiny`, `base`, `small`, `medium`, `large-v3`, `large-v3-turbo`).
+3. **Session Logs**: View, refresh, or clear transcription history logs.
 
 ---
 

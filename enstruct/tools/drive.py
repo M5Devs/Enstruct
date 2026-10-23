@@ -1,7 +1,8 @@
+import json
 import logging
 import os
 import sys
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger("enstruct.tools.drive")
 if not logger.handlers:
@@ -14,12 +15,12 @@ if not logger.handlers:
 
 class DriveManager:
     """Manages Google Drive mounting and file storage for Google Colab environments,
-
-    with graceful fallbacks for local execution.
+    with graceful fallbacks for local execution, and handles persistent session history.
     """
 
     MOUNT_POINT: str = "/content/drive"
     SAVE_SUBDIR: str = "MyDrive/Enstruct_Transcriptions"
+    HISTORY_FILENAME: str = "enstruct_history.json"
 
     def __init__(self) -> None:
         """Initializes the DriveManager."""
@@ -62,7 +63,9 @@ class DriveManager:
         Returns:
             The complete destination folder path string.
         """
-        return os.path.join(self.MOUNT_POINT, self.SAVE_SUBDIR)
+        if self.is_colab:
+            return os.path.join(self.MOUNT_POINT, self.SAVE_SUBDIR)
+        return os.path.join(os.getcwd(), "enstruct_outputs")
 
     def save_file(self, filename: str, content: str) -> Optional[str]:
         """Saves text content (like subtitle or transcription) to the Google Drive directory.
@@ -98,3 +101,59 @@ class DriveManager:
         except Exception as e:
             logger.error("Failed to save file to Google Drive folder: %s", str(e))
             return None
+
+    def get_history_file_path(self) -> str:
+        """Returns the file path for the session history JSON file.
+
+        Returns:
+            Path string to 'enstruct_history.json'.
+        """
+        save_dir = self.get_save_directory()
+        os.makedirs(save_dir, exist_ok=True)
+        return os.path.join(save_dir, self.HISTORY_FILENAME)
+
+    def log_session(self, entry: Dict[str, Any]) -> None:
+        """Appends a session entry to the persistent session history JSON file.
+
+        Args:
+            entry: Dictionary containing session log details.
+        """
+        history = self.get_history()
+        history.append(entry)
+        file_path = self.get_history_file_path()
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(history, f, indent=2)
+            logger.info("Session logged successfully to %s", file_path)
+        except Exception as e:
+            logger.error("Failed to write history entry: %s", str(e))
+
+    def get_history(self) -> List[Dict[str, Any]]:
+        """Loads and returns recent session logs from the history JSON file.
+
+        Returns:
+            List of session log dictionaries.
+        """
+        file_path = self.get_history_file_path()
+        if not os.path.exists(file_path):
+            return []
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
+                return []
+        except Exception as e:
+            logger.error("Failed to read history logs: %s", str(e))
+            return []
+
+    def clear_history(self) -> None:
+        """Clears all session log records."""
+        file_path = self.get_history_file_path()
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump([], f, indent=2)
+                logger.info("Session history cleared.")
+            except Exception as e:
+                logger.error("Failed to clear history: %s", str(e))

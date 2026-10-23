@@ -19,7 +19,7 @@ class EnstructTranslator:
 
     def __init__(
         self,
-        model_size: str = "large-v3",
+        model_size: str = "large-v3-turbo",
         device: str = "auto",
         compute_type: str = "auto"
     ) -> None:
