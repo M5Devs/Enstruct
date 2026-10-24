@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  enstruct:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: enstruct-service
+    ports:
+      - "7860:7860" # Gradio Web UI
+      - "8000:8000" # REST API
+    volumes:
+      - ./inbox:/inbox
+      - ./outbox:/outbox
+      - ./data:/app/enstruct_outputs
+    environment:
+      - MODEL_SIZE=large-v3-turbo
+      - COMPUTE_TYPE=float16
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped

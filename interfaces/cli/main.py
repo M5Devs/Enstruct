@@ -8,6 +8,7 @@ from enstruct.core.transcriber import EnstructTranscriber
 from enstruct.core.translator import EnstructTranslator
 from enstruct.tools.batch import BatchProcessor
 from enstruct.tools.subtitle import SubtitleGenerator
+from enstruct.tools.watch import FolderWatcher
 
 # Configure console logging for CLI
 logger = logging.getLogger()
@@ -119,6 +120,58 @@ def detect_language(audio: str) -> None:
         click.echo(f"Detected Language Code: {lang_code}")
     except Exception as e:
         click.echo(f"Error during language detection: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command('watch')
+@click.option('--input-dir', required=True, help='Directory to monitor for incoming audio/video files.')
+@click.option('--output-dir', required=True, help='Directory where subtitles/transcripts will be written.')
+@click.option('--format', '-f', default='srt', type=click.Choice(['srt', 'vtt', 'txt'], case_sensitive=False),
+              help='Output format (srt, vtt, txt). Defaults to srt.')
+@click.option('--archive-dir', default=None, help='Directory to archive processed files. Defaults to input-dir/.processed.')
+@click.option('--language', '-l', default=None, help='ISO 639-1 language code.')
+@click.option('--model', default='large-v3-turbo', help='Whisper model size.')
+@click.option('--interval', default=5.0, type=float, help='Polling interval in seconds.')
+def watch(
+    input_dir: str,
+    output_dir: str,
+    format: str,
+    archive_dir: Optional[str],
+    language: Optional[str],
+    model: str,
+    interval: float
+) -> None:
+    """Watch an inbox folder and auto-transcribe files to an outbox folder."""
+    click.echo(f"Watching folder {input_dir} for new files...")
+    try:
+        watcher = FolderWatcher(
+            input_dir=input_dir,
+            output_dir=output_dir,
+            format=format,
+            archive_dir=archive_dir,
+            language=language,
+            model_size=model,
+            poll_interval=interval
+        )
+        watcher.start_watching(run_loop=True)
+    except KeyboardInterrupt:
+        click.echo("Stopped watching folder.")
+    except Exception as e:
+        click.echo(f"Error in folder watcher: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command('api')
+@click.option('--host', default='0.0.0.0', help='Host to bind the API server to.')
+@click.option('--port', default=8000, type=int, help='Port to bind the API server to.')
+def api(host: str, port: int) -> None:
+    """Start the OpenAI-compatible REST API server."""
+    click.echo(f"Starting Enstruct API server on http://{host}:{port}")
+    try:
+        import uvicorn
+        uvicorn.run("interfaces.api.server:app", host=host, port=port, reload=False)
+    except Exception as e:
+        click.echo(f"Error starting API server: {e}", err=True)
         sys.exit(1)
 
 
